@@ -510,9 +510,22 @@ script.src = 'https://' + 'api.' + 'deezer.com' + endpoint + separator + 'output
         renderCovers(roundChoices);
         playPreview(correctTrack.preview);
     };
-    const renderCovers = function(items) {
+        const renderCovers = function(items) {
         const grid = document.getElementById('covers-grid');
         grid.innerHTML = '';
+
+        const isPortraitMobile = window.innerWidth < 540;
+        let cols = 2;
+        if (!isPortraitMobile) {
+            if (items.length === 4) cols = 4;
+            else if (items.length === 6) cols = 3;
+            else if (items.length === 8) cols = 4;
+            else cols = Math.ceil(items.length / 2);
+        }
+
+        grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
+        grid.style.gap = isPortraitMobile ? '10px' : '16px';
+
         items.forEach(function(item) {
             const card = document.createElement('div');
             card.dataset.isCorrect = item.isCorrect ? '1' : '0';
@@ -528,7 +541,6 @@ script.src = 'https://' + 'api.' + 'deezer.com' + endpoint + separator + 'output
             grid.appendChild(card);
         });
     };
-
     const handleGuess = function(selectedItem, clickedCard) {
         if (gameState.hasAnswered) return;
         gameState.hasAnswered = true;
