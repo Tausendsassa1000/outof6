@@ -596,7 +596,7 @@ script.src = 'https://' + 'api.' + 'deezer.com' + endpoint + separator + 'output
         const leaders = gameConfig.players.filter(function(p) { return p.score === maxScore; });
         if (leaders.length === 1) {
             audioPlayer.pause();
-            showWinnerScreen(leaders);
+            showWinnerScreen(leaders[0]);
         } else {
             gameState.isTiebreaker = true;
             gameState.tiebreakerRound += 1;
