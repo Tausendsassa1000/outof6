@@ -394,22 +394,25 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
         });
     };
 
-    const resolveCuratedTrack = async function(pair) {
+    const resolveCuratedTrack = async function(pair, retryCount) {
+        const tries = retryCount || 0;
         const title = Array.isArray(pair) ? pair.at(0) : (pair.title || String(pair));
         const artist = Array.isArray(pair) ? pair.at(1) : (pair.artist || '');
-        const q = artist ? ('artist:"' + artist + '" track:"' + title + '"') : title;
+        const q = artist ? (title + ' ' + artist).trim() : title;
         try {
-            let data = await fetchDeezerJSONP('/search?q=' + encodeURIComponent(q) + '&limit=3');
-            if (!data || !data.data || data.data.length === 0) {
-                data = await fetchDeezerJSONP('/search?q=' + encodeURIComponent((title + ' ' + artist).trim()) + '&limit=3');
-            }
+            const data = await fetchDeezerJSONP('/search?q=' + encodeURIComponent(q) + '&limit=3');
             if (data && data.data) {
                 const valid = data.data.find(function(t) {
                     return t && t.id && t.preview && t.preview.length > 5 && t.album && (t.album.cover_big || t.album.cover_medium);
                 });
                 return valid || null;
             }
-        } catch (e) {}
+        } catch (e) {
+            if (tries < 2 && String(e.message || '').toLowerCase().includes('quota')) {
+                await new Promise(function(r) { setTimeout(r, 1600); });
+                return resolveCuratedTrack(pair, tries + 1);
+            }
+        }
         return null;
     };
 
@@ -418,17 +421,17 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
         const found = Object.entries(catalog).find(function(e) { return e.at(0) === catalogKey; });
         const entry = found ? found.at(1) : null;
         if (!entry) throw new Error('Katalog-Playlist nicht gefunden.');
-        const targetCount = Math.min(entry.tracks.length, Math.max(48, gameConfig.rounds * gameConfig.players.length * 2 + gameConfig.coverCount + 12));
+        const targetCount = Math.min(entry.tracks.length, gameConfig.rounds * gameConfig.players.length + gameConfig.coverCount + 24);
         const sample = shuffleArray(entry.tracks);
         const resolved = new Array();
-        const batchSize = 4;
+        const batchSize = 3;
         for (let i = 0; i < sample.length; i += batchSize) {
             statusCallback('Bereite Songs vor (' + resolved.length + ' / ' + targetCount + ')...');
             const batch = sample.slice(i, i + batchSize);
-            const results = await Promise.all(batch.map(resolveCuratedTrack));
+            const results = await Promise.all(batch.map(function(item) { return resolveCuratedTrack(item, 0); }));
             results.forEach(function(r) { if (r) resolved.push(r); });
             if (resolved.length >= targetCount) break;
-            await new Promise(function(r) { setTimeout(r, 380); });
+            await new Promise(function(r) { setTimeout(r, 450); });
         }
         return resolved;
     };
