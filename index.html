@@ -21,9 +21,11 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
 .rule-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; gap: 8px; }
 .rule-row:last-child { margin-bottom: 0; }
 .players-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
-#gameRoot.fullscreen-play { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; max-width: none; height: 100dvh; min-height: 100dvh; margin: 0; border-radius: 0; border: none; padding: 10px 14px; z-index: 2147483647; overscroll-behavior: none; touch-action: manipulation; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
-#gameRoot.fullscreen-play #screen-game { display: flex !important; flex-direction: column; justify-content: space-between; flex: 1; min-height: 0; }
-#gameRoot.fullscreen-play #covers-grid { flex: 1; min-height: 0; align-content: center; max-width: min(92vw, 54dvh); margin: 0 auto; width: 100%; }
+#gameRoot.fullscreen-play { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; max-width: none; height: 100dvh; min-height: 100dvh; margin: 0; border-radius: 0; border: none; padding: 8px 14px; z-index: 2147483647; overscroll-behavior: none; touch-action: manipulation; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; }
+#gameRoot.fullscreen-play #screen-game { display: flex !important; flex-direction: column; justify-content: flex-start; flex: 1; min-height: 0; gap: 6px; }
+#gameRoot.fullscreen-play #covers-grid { display: grid; justify-content: center; align-content: start; margin: 2px auto 0 auto; width: 100%; }
+=== ENDE ===
+=== ENDE ===
 #rotate-warning { display: none; position: fixed; inset: 0; background: #0f172a; color: #fbbf24; z-index: 2147483647; align-items: center; justify-content: center; text-align: center; padding: 20px; font-size: 18px; font-weight: 700; }
 @media (max-width: 600px) {
   #gameRoot { min-height: auto; margin: 6px auto; padding: 10px; border-radius: 14px; }
@@ -390,11 +392,13 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
     };
 
     const resolveCuratedTrack = async function(pair) {
-        const q = 'artist:"' + pair.at(1) + '" track:"' + pair.at(0) + '"';
+        const title = Array.isArray(pair) ? pair.at(0) : (pair.title || String(pair));
+        const artist = Array.isArray(pair) ? pair.at(1) : (pair.artist || '');
+        const q = artist ? ('artist:"' + artist + '" track:"' + title + '"') : title;
         try {
             let data = await fetchDeezerJSONP('/search?q=' + encodeURIComponent(q) + '&limit=3');
             if (!data || !data.data || data.data.length === 0) {
-                data = await fetchDeezerJSONP('/search?q=' + encodeURIComponent(pair.at(0) + ' ' + pair.at(1)) + '&limit=3');
+                data = await fetchDeezerJSONP('/search?q=' + encodeURIComponent((title + ' ' + artist).trim()) + '&limit=3');
             }
             if (data && data.data) {
                 const valid = data.data.find(function(t) {
@@ -405,24 +409,27 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
         } catch (e) {}
         return null;
     };
+
     const loadCuratedCatalogTracks = async function(catalogKey, statusCallback) {
         const catalog = window.GUERILLAZ_CATALOG || {};
         const found = Object.entries(catalog).find(function(e) { return e.at(0) === catalogKey; });
         const entry = found ? found.at(1) : null;
         if (!entry) throw new Error('Katalog-Playlist nicht gefunden.');
-        const needed = Math.min(entry.tracks.length, Math.max(40, gameConfig.rounds * gameConfig.players.length * 2 + 20));
-        const sample = shuffleArray(entry.tracks).slice(0, needed);
+        const targetCount = Math.min(entry.tracks.length, Math.max(80, gameConfig.rounds * gameConfig.players.length * 3 + 30));
+        const maxSample = Math.min(entry.tracks.length, targetCount + 40);
+        const sample = shuffleArray(entry.tracks).slice(0, maxSample);
         const resolved = new Array();
-        const batchSize = 6;
+        const batchSize = 8;
         for (let i = 0; i < sample.length; i += batchSize) {
-            statusCallback('Bereite Songs vor (' + resolved.length + ' / ' + needed + ')...');
+            statusCallback('Bereite Songs vor (' + resolved.length + ' / ' + targetCount + ')...');
             const batch = sample.slice(i, i + batchSize);
             const results = await Promise.all(batch.map(resolveCuratedTrack));
             results.forEach(function(r) { if (r) resolved.push(r); });
-            if (resolved.length >= gameConfig.rounds * gameConfig.players.length + gameConfig.coverCount + 6) break;
+            if (resolved.length >= targetCount) break;
         }
         return resolved;
     };
+
 
     const getPlayedIds = function(playlistId) {
         try {
@@ -607,19 +614,32 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
         const grid = document.getElementById('covers-grid');
         grid.innerHTML = '';
 
-        const isPortraitMobile = window.innerWidth < 540;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const isPortraitMobile = vw < 600;
         let cols = 2;
-        if (!isPortraitMobile) {
-            if (items.length === 4) cols = 4;
+        let gap = isPortraitMobile ? 8 : 14;
+        let cardSize = 140;
+
+        if (isPortraitMobile) {
+            cols = 2;
+            const rows = Math.ceil(items.length / 2);
+            const availW = Math.floor((vw - 36 - gap) / 2);
+            const availH = Math.floor((vh - 230 - (rows - 1) * gap) / rows);
+            cardSize = Math.max(76, Math.min(availW, availH, 165));
+        } else {
+            if (items.length === 4) cols = 2;
             else if (items.length === 6) cols = 3;
             else if (items.length === 8) cols = 4;
             else cols = Math.ceil(items.length / 2);
-        } else if (items.length === 8) {
-            cols = 4;
+            const maxContainerW = Math.min(vw - 40, 920);
+            const maxByWidth = Math.floor((maxContainerW - 3 * gap) / 4);
+            const maxByHeight = Math.floor((vh - 245 - gap) / 2);
+            cardSize = Math.max(110, Math.min(maxByWidth, maxByHeight));
         }
 
-        grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
-        grid.style.gap = isPortraitMobile ? '6px' : '12px';
+        grid.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cardSize + 'px)';
+        grid.style.gap = gap + 'px';
 
         items.forEach(function(item) {
             const card = document.createElement('div');
