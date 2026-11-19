@@ -418,17 +418,17 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
         const found = Object.entries(catalog).find(function(e) { return e.at(0) === catalogKey; });
         const entry = found ? found.at(1) : null;
         if (!entry) throw new Error('Katalog-Playlist nicht gefunden.');
-        const targetCount = Math.min(entry.tracks.length, Math.max(80, gameConfig.rounds * gameConfig.players.length * 3 + 30));
-        const maxSample = Math.min(entry.tracks.length, targetCount + 40);
-        const sample = shuffleArray(entry.tracks).slice(0, maxSample);
+        const targetCount = Math.min(entry.tracks.length, Math.max(48, gameConfig.rounds * gameConfig.players.length * 2 + gameConfig.coverCount + 12));
+        const sample = shuffleArray(entry.tracks);
         const resolved = new Array();
-        const batchSize = 8;
+        const batchSize = 4;
         for (let i = 0; i < sample.length; i += batchSize) {
             statusCallback('Bereite Songs vor (' + resolved.length + ' / ' + targetCount + ')...');
             const batch = sample.slice(i, i + batchSize);
             const results = await Promise.all(batch.map(resolveCuratedTrack));
             results.forEach(function(r) { if (r) resolved.push(r); });
             if (resolved.length >= targetCount) break;
+            await new Promise(function(r) { setTimeout(r, 380); });
         }
         return resolved;
     };
