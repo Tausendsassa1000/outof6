@@ -24,8 +24,10 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
 #gameRoot.fullscreen-play { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; max-width: none; height: 100dvh; min-height: 100dvh; margin: 0; border-radius: 0; border: none; padding: 8px 14px; z-index: 2147483647; overscroll-behavior: none; touch-action: manipulation; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; }
 #gameRoot.fullscreen-play #screen-game { display: flex !important; flex-direction: column; justify-content: flex-start; flex: 1; min-height: 0; gap: 6px; }
 #gameRoot.fullscreen-play #covers-grid { display: grid; justify-content: center; align-content: start; margin: 2px auto 0 auto; width: 100%; }
-=== ENDE ===
-=== ENDE ===
+@media (min-width: 600px) {
+  #gameRoot.fullscreen-play #covers-grid { flex: 1; align-content: center; margin: 0 auto; }
+}
+
 #rotate-warning { display: none; position: fixed; inset: 0; background: #0f172a; color: #fbbf24; z-index: 2147483647; align-items: center; justify-content: center; text-align: center; padding: 20px; font-size: 18px; font-weight: 700; }
 @media (max-width: 600px) {
   #gameRoot { min-height: auto; margin: 6px auto; padding: 10px; border-radius: 14px; }
@@ -34,8 +36,8 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
   .players-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
   .ka2-title { font-size: 18px; margin-bottom: 8px; }
 }
-@media (orientation: landscape) and (max-height: 460px) {
-  #gameRoot.fullscreen-play #rotate-warning { display: flex; }
+@media (orientation: landscape) and (max-height: 460px) and (pointer: coarse) {
+  #gameRoot.fullscreen-play #rotate-warning { display: flex !important; }
 }
 </style>
 </head>
@@ -44,7 +46,8 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
     <div id="rotate-warning">↻ Bitte drehe dein Smartphone ins Hochformat</div>
     <div class="ka2-bar">
         <div class="ka2-brand">
-            <svg width="44" height="19" viewBox="0 0 44 19" xmlns="http://w3.org" aria-label="KA2 Logo">
+            <svg width="44" height="19" viewBox="0 0 44 19" xmlns="http://www.w3.org/2000/svg" aria-label="KA2 Logo">
+
                 <ellipse cx="22" cy="9.5" rx="21.5" ry="9" fill="#1e293b"/>
                 <text x="22" y="13" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="10.5" fill="#fbbf24" letter-spacing="0.5">KA2</text>
             </svg>
@@ -505,6 +508,7 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
     const playPreview = function(previewUrl) {
         const badge = document.getElementById('audio-playing-badge');
         audioPlayer.pause();
+        audioPlayer.volume = 1;
         audioPlayer.src = previewUrl;
         audioPlayer.currentTime = 0;
         badge.innerText = '♪ Hörprobe läuft...';
@@ -515,7 +519,18 @@ body:has(> #gameRoot) { margin: 0; padding: 8px; background: #090e1a; }
         });
     };
 
+    audioPlayer.ontimeupdate = function() {
+        if (!audioPlayer.duration || isNaN(audioPlayer.duration)) return;
+        const remaining = audioPlayer.duration - audioPlayer.currentTime;
+        if (remaining <= 2.5 && remaining > 0) {
+            audioPlayer.volume = Math.max(0, Math.min(1, remaining / 2.5));
+        } else if (remaining > 2.5 && audioPlayer.volume < 1) {
+            audioPlayer.volume = 1;
+        }
+    };
+
     audioPlayer.onended = function() {
+        audioPlayer.volume = 1;
         const badge = document.getElementById('audio-playing-badge');
         badge.innerText = 'Hörprobe beendet';
         badge.style.color = '#94a3b8';
